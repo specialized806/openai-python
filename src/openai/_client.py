@@ -29,7 +29,7 @@ from ._utils import (
     get_async_library,
 )
 from ._compat import cached_property
-from ._models import SecurityOptions
+from ._models import SecurityOptions, FinalRequestOptions
 from ._version import __version__
 from ._streaming import Stream as Stream, AsyncStream as AsyncStream
 from ._exceptions import OpenAIError, APIStatusError
@@ -408,14 +408,10 @@ class OpenAI(SyncAPIClient):
         **kwargs: Unpack[HttpxSendArgs],
     ) -> httpx.Response:
         used_workload_identity_auth = False
-        if self._api_key_provider is not None:
-            authorization = request.headers.get("Authorization")
-            if authorization is None or authorization == f"Bearer {self.api_key}":
-                request.headers["Authorization"] = f"Bearer {self._refresh_api_key()}"
 
         if self._workload_identity_auth is not None:
             authorization = request.headers.get("Authorization")
-            if authorization is None or authorization == f"Bearer {WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}":
+            if authorization == f"Bearer {WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}":
                 request.headers["Authorization"] = f"Bearer {self._workload_identity_auth.get_token()}"
                 used_workload_identity_auth = True
 
@@ -493,12 +489,16 @@ class OpenAI(SyncAPIClient):
         if _has_header(headers, "Authorization") or _has_omitted_header(custom_headers, "Authorization"):
             return
 
-        if self._api_key_provider is not None or self._workload_identity_auth is not None:
-            return
-
         raise TypeError(
             '"Could not resolve authentication method. Expected either api_key or admin_api_key to be set. Or for one of the `Authorization` or `Authorization` headers to be explicitly omitted"'
         )
+
+    @override
+    def _prepare_options(self, options: FinalRequestOptions) -> FinalRequestOptions:
+        if self._api_key_provider is not None and options.security.get("bearer_auth", False):
+            self._refresh_api_key()
+
+        return super()._prepare_options(options)
 
     def _refresh_api_key(self) -> str:
         if self._api_key_provider is not None:
@@ -914,14 +914,10 @@ class AsyncOpenAI(AsyncAPIClient):
         **kwargs: Unpack[HttpxSendArgs],
     ) -> httpx.Response:
         used_workload_identity_auth = False
-        if self._api_key_provider is not None:
-            authorization = request.headers.get("Authorization")
-            if authorization is None or authorization == f"Bearer {self.api_key}":
-                request.headers["Authorization"] = f"Bearer {await self._refresh_api_key()}"
 
         if self._workload_identity_auth is not None:
             authorization = request.headers.get("Authorization")
-            if authorization is None or authorization == f"Bearer {WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}":
+            if authorization == f"Bearer {WORKLOAD_IDENTITY_API_KEY_PLACEHOLDER}":
                 request.headers["Authorization"] = f"Bearer {await self._workload_identity_auth.get_token_async()}"
                 used_workload_identity_auth = True
 
@@ -999,12 +995,16 @@ class AsyncOpenAI(AsyncAPIClient):
         if _has_header(headers, "Authorization") or _has_omitted_header(custom_headers, "Authorization"):
             return
 
-        if self._api_key_provider is not None or self._workload_identity_auth is not None:
-            return
-
         raise TypeError(
             '"Could not resolve authentication method. Expected either api_key or admin_api_key to be set. Or for one of the `Authorization` or `Authorization` headers to be explicitly omitted"'
         )
+
+    @override
+    async def _prepare_options(self, options: FinalRequestOptions) -> FinalRequestOptions:
+        if self._api_key_provider is not None and options.security.get("bearer_auth", False):
+            await self._refresh_api_key()
+
+        return await super()._prepare_options(options)
 
     async def _refresh_api_key(self) -> str:
         if self._api_key_provider is not None:
