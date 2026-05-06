@@ -43,7 +43,7 @@ Homepage = "https://github.com/openai/openai-python"
 Repository = "https://github.com/openai/openai-python"
 
 [project.scripts]
-openai = "openai.cli:main"
+openai-python = "openai.cli:main"
 
 [project.optional-dependencies]
 aiohttp = ["aiohttp", "httpx_aiohttp>=0.1.9"]
